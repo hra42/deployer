@@ -198,3 +198,7 @@ If the Cloudflare fields are blank, deployer still ships the containers — it j
 - Create or manage Cloudflare Zero Trust policies. It only **attaches** a policy you've already created, by ID.
 - Roll back on partial failure. If phase 5 fails after phase 4 succeeded, the containers stay up; the summary tells you so. Fix the underlying issue and re-run.
 - Verify SSH host keys against `known_hosts` (yet). The current build uses `InsecureIgnoreHostKey`. Don't run this against hosts you don't already trust.
+
+## License
+
+[The Unlicense](LICENSE) — public domain. Do whatever you want.
