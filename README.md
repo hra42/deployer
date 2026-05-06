@@ -6,6 +6,23 @@ The boring config (SSH host, key path, GitHub token, Cloudflare credentials) liv
 
 ## Install
 
+One-line install (downloads the latest release binary, verifies its SHA-256, installs to `/usr/local/bin` or `$HOME/.local/bin`):
+
+```sh
+curl -fsSL https://deployer.hra42.lol/install | sh
+```
+
+Pin a specific version or override the install location:
+
+```sh
+curl -fsSL https://deployer.hra42.lol/install | VERSION=v0.1.0 sh
+curl -fsSL https://deployer.hra42.lol/install | INSTALL_DIR=$HOME/.local/bin sh
+```
+
+Supported targets: `darwin/arm64`, `linux/arm64`, `linux/amd64`. macOS x86_64 is not built — install from source instead.
+
+From source:
+
 ```sh
 go install github.com/hra42/deployer@latest
 ```
