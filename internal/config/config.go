@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultCNAMETarget = "ai-host.seventhings.app"
+const DefaultCNAMETarget = "host.example.com"
 
 type Config struct {
 	SSHHost             string `yaml:"ssh_host"`

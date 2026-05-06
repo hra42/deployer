@@ -60,8 +60,8 @@ Expected output on a successful run:
     ✓ project app-example-com up
 
 ==> [5/6] Cloudflare DNS
-    creating CNAME app.example.com → ai-host.seventhings.app
-    ✓ proxied CNAME app.example.com → ai-host.seventhings.app
+    creating CNAME app.example.com → host.example.com
+    ✓ proxied CNAME app.example.com → host.example.com
 
 ==> [6/6] Cloudflare Zero Trust
     creating Access app for app.example.com
@@ -72,7 +72,7 @@ Expected output on a successful run:
     ✓ Sync repo              ok — /srv/apps/app-example-com
     ✓ Validate compose files ok
     ✓ Bring up containers    ok — project app-example-com
-    ✓ Cloudflare DNS         ok — CNAME app.example.com → ai-host.seventhings.app
+    ✓ Cloudflare DNS         ok — CNAME app.example.com → host.example.com
     ✓ Cloudflare Zero Trust  ok — policy <id>
     ✓ deploy complete: app.example.com
 ```
@@ -172,7 +172,7 @@ All fields live in `~/.deployer.yml`. CLI flags (where they exist) override the 
 | `cloudflare_zone_id` | optional | Zone ID for the domain's parent zone. Required for the DNS phase. |
 | `cloudflare_account_id` | optional | Cloudflare account ID. Required for the Zero Trust phase. |
 | `zero_trust_policy_id` | optional | ID of a pre-existing Access policy to attach to each deployed app. |
-| `cname_target` | optional | What every CNAME points at. Defaults to `ai-host.seventhings.app`. |
+| `cname_target` | optional | What every CNAME points at. Defaults to `host.example.com`. |
 
 Example:
 
@@ -186,7 +186,7 @@ cloudflare_api_token: cf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 cloudflare_zone_id: 0123456789abcdef0123456789abcdef
 cloudflare_account_id: fedcba9876543210fedcba9876543210
 zero_trust_policy_id: 11111111-2222-3333-4444-555555555555
-cname_target: ai-host.seventhings.app
+cname_target: host.example.com
 ```
 
 If the Cloudflare fields are blank, deployer still ships the containers — it just skips DNS and Zero Trust and tells you so in the summary.
