@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/hra42/deployer/internal/cloudflare"
 	"github.com/hra42/deployer/internal/config"
 	"github.com/hra42/deployer/internal/slug"
 	"github.com/hra42/deployer/internal/sshx"
+	"github.com/hra42/deployer/internal/state"
 	"github.com/hra42/deployer/internal/ui"
 )
 
@@ -26,6 +28,7 @@ var phaseNames = []string{
 	"Bring up containers",
 	"Cloudflare DNS",
 	"Cloudflare Zero Trust",
+	"Record state",
 }
 
 func Run(ctx context.Context, opts Options) (err error) {
@@ -199,6 +202,22 @@ func Run(ctx context.Context, opts Options) (err error) {
 		ui.OK(fmt.Sprintf("Access app for %s protected by policy %s", opts.Domain, opts.Cfg.ZeroTrustPolicyID))
 		mark(5, ui.StatusOK, fmt.Sprintf("policy %s", opts.Cfg.ZeroTrustPolicyID))
 	}
+
+	// Phase 7: Record state
+	ui.Phase(7, phaseNames[6])
+	svc := state.Service{
+		Repo:       opts.Repo,
+		Slug:       s,
+		ClonePath:  opts.Cfg.ClonePath,
+		DeployedAt: time.Now().UTC(),
+	}
+	if err = state.Upsert(ctx, client, opts.Cfg.ClonePath, opts.Domain, svc); err != nil {
+		ui.Failf("record state for %s: %v", opts.Domain, err)
+		mark(6, ui.StatusFailed, fmt.Sprintf("state for %s", opts.Domain))
+		return err
+	}
+	ui.OK(fmt.Sprintf("recorded state for %s", opts.Domain))
+	mark(6, ui.StatusOK, "")
 
 	completed = true
 	return nil

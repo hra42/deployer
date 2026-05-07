@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-const TotalPhases = 6
+const TotalPhases = 7
 
 type Status string
 
