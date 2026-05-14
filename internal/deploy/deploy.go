@@ -128,7 +128,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 
 	// Phase 5: Cloudflare DNS
 	ui.Phase(5, phaseNames[4])
-	if opts.Cfg.CloudflareAPIToken == "" || opts.Cfg.CloudflareZoneID == "" {
+	if opts.Cfg.CloudflareAPIToken == "" {
 		ui.Warn("skipped: cloudflare credentials not set")
 		mark(4, ui.StatusSkipped, "cloudflare credentials not set")
 	} else if opts.Cfg.CNAMETarget == "" {
@@ -136,8 +136,25 @@ func Run(ctx context.Context, opts Options) (err error) {
 		mark(4, ui.StatusSkipped, "cname_target not set")
 	} else {
 		cf := cloudflare.New(opts.Cfg.CloudflareAPIToken)
+
+		// Resolve the zone: explicit config takes precedence; otherwise look
+		// up the zone that owns opts.Domain. The token needs Zone:Zone:Read
+		// for the lookup.
+		zoneID := opts.Cfg.CloudflareZoneID
+		if zoneID == "" {
+			var z *cloudflare.Zone
+			z, err = cf.FindZoneByDomain(ctx, opts.Domain)
+			if err != nil {
+				ui.Failf("cloudflare dns for %s: %v", opts.Domain, err)
+				mark(4, ui.StatusFailed, fmt.Sprintf("cloudflare dns for %s", opts.Domain))
+				return err
+			}
+			zoneID = z.ID
+			ui.Info(fmt.Sprintf("resolved zone %s (%s)", z.Name, z.ID))
+		}
+
 		var existing *cloudflare.DNSRecord
-		existing, err = cf.FindCNAME(ctx, opts.Cfg.CloudflareZoneID, opts.Domain)
+		existing, err = cf.FindCNAME(ctx, zoneID, opts.Domain)
 		if err != nil {
 			ui.Failf("cloudflare dns for %s: %v", opts.Domain, err)
 			mark(4, ui.StatusFailed, fmt.Sprintf("cloudflare dns for %s", opts.Domain))
@@ -145,14 +162,14 @@ func Run(ctx context.Context, opts Options) (err error) {
 		}
 		if existing == nil {
 			ui.Info(fmt.Sprintf("creating CNAME %s → %s", opts.Domain, opts.Cfg.CNAMETarget))
-			if err = cf.CreateCNAME(ctx, opts.Cfg.CloudflareZoneID, opts.Domain, opts.Cfg.CNAMETarget); err != nil {
+			if err = cf.CreateCNAME(ctx, zoneID, opts.Domain, opts.Cfg.CNAMETarget); err != nil {
 				ui.Failf("cloudflare dns for %s: %v", opts.Domain, err)
 				mark(4, ui.StatusFailed, fmt.Sprintf("cloudflare dns for %s", opts.Domain))
 				return err
 			}
 		} else {
 			ui.Info(fmt.Sprintf("updating CNAME %s → %s", opts.Domain, opts.Cfg.CNAMETarget))
-			if err = cf.UpdateCNAME(ctx, opts.Cfg.CloudflareZoneID, existing.ID, opts.Domain, opts.Cfg.CNAMETarget); err != nil {
+			if err = cf.UpdateCNAME(ctx, zoneID, existing.ID, opts.Domain, opts.Cfg.CNAMETarget); err != nil {
 				ui.Failf("cloudflare dns for %s: %v", opts.Domain, err)
 				mark(4, ui.StatusFailed, fmt.Sprintf("cloudflare dns for %s", opts.Domain))
 				return err
@@ -173,6 +190,29 @@ func Run(ctx context.Context, opts Options) (err error) {
 	} else {
 		cf := cloudflare.New(opts.Cfg.CloudflareAPIToken)
 		policies := []string{opts.Cfg.ZeroTrustPolicyID}
+
+		// Auto-detect "instant auth": if the account has exactly one real IdP
+		// (i.e. everything except the implicit onetimepin pseudo-IdP), pin the
+		// app to it and skip Cloudflare's IdP picker. With zero or 2+ real
+		// IdPs, leave Cloudflare's defaults in place.
+		appOpts := cloudflare.AccessAppOptions{}
+		idps, idpErr := cf.ListIdentityProviders(ctx, opts.Cfg.CloudflareAccountID)
+		if idpErr != nil {
+			ui.Warn(fmt.Sprintf("could not list IdPs to auto-enable instant auth: %v", idpErr))
+		} else {
+			var real []cloudflare.IdentityProvider
+			for _, p := range idps {
+				if p.Type != "onetimepin" {
+					real = append(real, p)
+				}
+			}
+			if len(real) == 1 {
+				appOpts.AllowedIdPs = []string{real[0].ID}
+				appOpts.AutoRedirectToIdentity = true
+				ui.Info(fmt.Sprintf("instant auth: pinning to IdP %q", real[0].Name))
+			}
+		}
+
 		var existing *cloudflare.AccessApp
 		existing, err = cf.FindAccessApp(ctx, opts.Cfg.CloudflareAccountID, opts.Domain)
 		if err != nil {
@@ -182,14 +222,14 @@ func Run(ctx context.Context, opts Options) (err error) {
 		}
 		if existing == nil {
 			ui.Info(fmt.Sprintf("creating Access app for %s", opts.Domain))
-			if _, err = cf.CreateAccessApp(ctx, opts.Cfg.CloudflareAccountID, opts.Domain, opts.Domain, policies); err != nil {
+			if _, err = cf.CreateAccessApp(ctx, opts.Cfg.CloudflareAccountID, opts.Domain, opts.Domain, policies, appOpts); err != nil {
 				ui.Failf("cloudflare access for %s: %v", opts.Domain, err)
 				mark(5, ui.StatusFailed, fmt.Sprintf("cloudflare access for %s", opts.Domain))
 				return err
 			}
 		} else {
 			ui.Info(fmt.Sprintf("updating Access app for %s", opts.Domain))
-			if err = cf.UpdateAccessApp(ctx, opts.Cfg.CloudflareAccountID, existing.ID, opts.Domain, opts.Domain, policies); err != nil {
+			if err = cf.UpdateAccessApp(ctx, opts.Cfg.CloudflareAccountID, existing.ID, opts.Domain, opts.Domain, policies, appOpts); err != nil {
 				ui.Failf("cloudflare access for %s: %v", opts.Domain, err)
 				mark(5, ui.StatusFailed, fmt.Sprintf("cloudflare access for %s", opts.Domain))
 				return err

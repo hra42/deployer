@@ -85,6 +85,67 @@ func TestCreateCNAMEBody(t *testing.T) {
 	}
 }
 
+func TestFindZoneByDomainApex(t *testing.T) {
+	queries := []string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		queries = append(queries, r.URL.Query().Get("name"))
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("name") == "foo.com" {
+			_, _ = w.Write([]byte(`{"success":true,"errors":[],"result":[{"id":"z1","name":"foo.com"}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"success":true,"errors":[],"result":[]}`))
+	}))
+	defer srv.Close()
+
+	c := newWithBase("tok", srv.URL)
+	z, err := c.FindZoneByDomain(context.Background(), "app.foo.com")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if z == nil || z.ID != "z1" || z.Name != "foo.com" {
+		t.Errorf("got %+v", z)
+	}
+	if len(queries) != 2 || queries[0] != "app.foo.com" || queries[1] != "foo.com" {
+		t.Errorf("query order = %v, want [app.foo.com foo.com]", queries)
+	}
+}
+
+func TestFindZoneByDomainSubzonePreferred(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("name") == "sub.foo.com" {
+			_, _ = w.Write([]byte(`{"success":true,"errors":[],"result":[{"id":"sub","name":"sub.foo.com"}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"success":true,"errors":[],"result":[]}`))
+	}))
+	defer srv.Close()
+
+	c := newWithBase("tok", srv.URL)
+	z, err := c.FindZoneByDomain(context.Background(), "app.sub.foo.com")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if z == nil || z.ID != "sub" {
+		t.Errorf("got %+v", z)
+	}
+}
+
+func TestFindZoneByDomainNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"errors":[],"result":[]}`))
+	}))
+	defer srv.Close()
+
+	c := newWithBase("tok", srv.URL)
+	_, err := c.FindZoneByDomain(context.Background(), "app.unknown.test")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func TestUpdateCNAMEPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {

@@ -5,7 +5,58 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 )
+
+// Zone is a minimal view of a Cloudflare zone.
+type Zone struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// FindZoneByDomain locates the Cloudflare zone that owns the given fully-
+// qualified domain. It walks from the most-specific candidate (the full
+// domain) up to the apex, asking Cloudflare for an exact match at each level,
+// and returns the first hit. Subzones (delegated subdomains held as their own
+// Cloudflare zone) are handled correctly because they match before their
+// parent.
+//
+// Requires the API token to have "Zone:Zone:Read" on the account so
+// /zones?name=... can be queried.
+func (c *Client) FindZoneByDomain(ctx context.Context, domain string) (*Zone, error) {
+	candidate := strings.TrimSuffix(strings.ToLower(domain), ".")
+	if candidate == "" {
+		return nil, fmt.Errorf("cloudflare: empty domain")
+	}
+	for {
+		q := url.Values{}
+		q.Set("name", candidate)
+		result, err := c.do(ctx, "GET", "/zones?"+q.Encode(), nil)
+		if err != nil {
+			return nil, err
+		}
+		var zones []Zone
+		if err := json.Unmarshal(result, &zones); err != nil {
+			return nil, fmt.Errorf("cloudflare: decode zones: %w", err)
+		}
+		for i := range zones {
+			if zones[i].Name == candidate {
+				return &zones[i], nil
+			}
+		}
+		// Strip the leftmost label and try the parent. Stop once there's no
+		// dot left (we'd be querying the TLD, which Cloudflare doesn't own).
+		idx := strings.Index(candidate, ".")
+		if idx < 0 {
+			break
+		}
+		candidate = candidate[idx+1:]
+		if !strings.Contains(candidate, ".") {
+			break
+		}
+	}
+	return nil, fmt.Errorf("cloudflare: no zone found for %q (token may lack Zone:Read or the domain isn't on this account)", domain)
+}
 
 type DNSRecord struct {
 	ID      string `json:"id,omitempty"`

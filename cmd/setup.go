@@ -53,7 +53,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	cfg.ClonePath = prompt(r, "Remote clone base path", "")
 	cfg.TraefikNetwork = prompt(r, "Traefik docker network name", "")
 	cfg.CloudflareAPIToken = prompt(r, "Cloudflare API token (blank to skip DNS/ZT)", "")
-	cfg.CloudflareZoneID = prompt(r, "Cloudflare zone ID", "")
+	cfg.CloudflareZoneID = prompt(r, "Cloudflare zone ID (blank to auto-detect from domain)", "")
 	cfg.CloudflareAccountID = prompt(r, "Cloudflare account ID", "")
 	cfg.ZeroTrustPolicyID = prompt(r, "Zero Trust policy ID", "")
 	cfg.CNAMETarget = prompt(r, "CNAME target", config.DefaultCNAMETarget)

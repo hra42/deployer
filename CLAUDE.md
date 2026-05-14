@@ -23,7 +23,7 @@ The pipeline lives entirely in `internal/deploy/deploy.Run`. It is a fixed 6-pha
 2. Sync repo — `git clone` on first run, `git pull --ff-only` thereafter. The clone URL is built by `buildCloneCmd`, which normalizes `owner/name` / `github.com/...` / full URLs and injects the GitHub token as `https://x-access-token:<token>@...`.
 3. Validate — checks `Dockerfile` and `docker-compose.yml` exist on the host.
 4. `docker compose build --pull && docker compose up -d --remove-orphans`, with `COMPOSE_PROJECT_NAME` set to the domain slug so multiple apps coexist on one host. `build --pull` rebuilds services with a `build:` directive against fresh base images; it's a no-op for `image:`-only services.
-5. Cloudflare DNS — create or update a proxied CNAME via `internal/cloudflare`.
+5. Cloudflare DNS — create or update a proxied CNAME via `internal/cloudflare`. If `cloudflare_zone_id` is not set, the zone is auto-resolved by walking the domain up to the apex via `GET /zones?name=...` (requires `Zone:Zone:Read` on the API token); the most-specific match wins, so delegated subzones are handled correctly.
 6. Cloudflare Zero Trust — create or update an Access app and attach a pre-existing policy.
 
 Phases 5 and 6 **skip** (don't fail) when their respective Cloudflare credentials are absent. Every phase records a `ui.SummaryItem`; the summary is printed via a `defer` so it appears even on partial failure. The pipeline does **not** roll back — a failure in phase 5 leaves the containers from phase 4 running. This is intentional.
