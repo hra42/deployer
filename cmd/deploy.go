@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hra42/deployer/internal/config"
 	"github.com/hra42/deployer/internal/deploy"
 )
 
@@ -21,6 +20,7 @@ type flagBinding struct {
 }
 
 func init() {
+	deployCmd.Flags().String("config", "", "Path to config file (default: $DEPLOYER_CONFIG, ~/.deployer.yml, then /etc/deployer.yml)")
 	deployCmd.Flags().String("repo", "", "GitHub repo (e.g. github.com/owner/name) (required)")
 	deployCmd.Flags().String("domain", "", "Public domain for this deployment (required)")
 
@@ -37,11 +37,7 @@ func init() {
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
-	path, err := config.DefaultPath()
-	if err != nil {
-		return err
-	}
-	cfg, err := config.Load(path)
+	cfg, err := loadConfigFromFlag(cmd)
 	if err != nil {
 		return err
 	}

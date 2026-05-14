@@ -13,7 +13,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hra42/deployer/internal/config"
 	"github.com/hra42/deployer/internal/sshx"
 	"github.com/hra42/deployer/internal/state"
 )
@@ -25,6 +24,7 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
+	listCmd.Flags().String("config", "", "Path to config file (default: $DEPLOYER_CONFIG, ~/.deployer.yml, then /etc/deployer.yml)")
 	listCmd.Flags().String("ssh-host", "", "SSH host (user@ip), overrides config")
 	listCmd.Flags().String("ssh-key-path", "", "SSH private key path, overrides config")
 	listCmd.Flags().String("clone-path", "", "Remote clone base path, overrides config")
@@ -33,11 +33,7 @@ func init() {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	cfgPath, err := config.DefaultPath()
-	if err != nil {
-		return err
-	}
-	cfg, err := config.Load(cfgPath)
+	cfg, err := loadConfigFromFlag(cmd)
 	if err != nil {
 		return err
 	}

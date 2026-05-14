@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hra42/deployer/internal/config"
 	"github.com/hra42/deployer/internal/deploy"
 	"github.com/hra42/deployer/internal/sshx"
 	"github.com/hra42/deployer/internal/state"
@@ -19,6 +18,7 @@ var updateCmd = &cobra.Command{
 }
 
 func init() {
+	updateCmd.Flags().String("config", "", "Path to config file (default: $DEPLOYER_CONFIG, ~/.deployer.yml, then /etc/deployer.yml)")
 	updateCmd.Flags().String("ssh-host", "", "SSH host (user@ip), overrides config")
 	updateCmd.Flags().String("ssh-key-path", "", "SSH private key path, overrides config")
 	updateCmd.Flags().String("github-token", "", "GitHub token, overrides config")
@@ -36,11 +36,7 @@ func init() {
 func runUpdate(cmd *cobra.Command, args []string) error {
 	domain := args[0]
 
-	cfgPath, err := config.DefaultPath()
-	if err != nil {
-		return err
-	}
-	cfg, err := config.Load(cfgPath)
+	cfg, err := loadConfigFromFlag(cmd)
 	if err != nil {
 		return err
 	}
