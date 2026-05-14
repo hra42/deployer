@@ -7,13 +7,26 @@ import (
 	"net/url"
 )
 
+// AccessApp is the shape we read back from the Cloudflare API. The Policies
+// field is deliberately a raw passthrough — on responses Cloudflare returns
+// full policy objects, but on requests it expects an array of policy ID
+// strings. Use accessAppRequest for writes.
 type AccessApp struct {
-	ID              string   `json:"id,omitempty"`
-	Name            string   `json:"name"`
-	Domain          string   `json:"domain"`
-	Type            string   `json:"type"`
-	SessionDuration string   `json:"session_duration,omitempty"`
-	Policies        []string `json:"policies,omitempty"`
+	ID              string          `json:"id,omitempty"`
+	Name            string          `json:"name"`
+	Domain          string          `json:"domain"`
+	Type            string          `json:"type"`
+	SessionDuration string          `json:"session_duration,omitempty"`
+	Policies        json.RawMessage `json:"policies,omitempty"`
+}
+
+// accessAppRequest is the body shape for Create/Update. Cloudflare expects
+// policies as a flat array of policy ID strings here.
+type accessAppRequest struct {
+	Name     string   `json:"name"`
+	Domain   string   `json:"domain"`
+	Type     string   `json:"type"`
+	Policies []string `json:"policies,omitempty"`
 }
 
 // FindAccessApp returns the first Access app whose domain matches in the given
@@ -46,7 +59,7 @@ func (c *Client) FindAccessApp(ctx context.Context, accountID, domain string) (*
 // CreateAccessApp creates a self_hosted Access app scoped to domain, attached
 // to the given reusable policy IDs, and returns the created app.
 func (c *Client) CreateAccessApp(ctx context.Context, accountID, name, domain string, policyIDs []string) (*AccessApp, error) {
-	body := AccessApp{
+	body := accessAppRequest{
 		Name:     name,
 		Domain:   domain,
 		Type:     "self_hosted",
@@ -68,7 +81,7 @@ func (c *Client) CreateAccessApp(ctx context.Context, accountID, name, domain st
 // attached to the given reusable policy IDs. The Cloudflare API treats the
 // policies array as authoritative — any policy not listed is detached.
 func (c *Client) UpdateAccessApp(ctx context.Context, accountID, appID, name, domain string, policyIDs []string) error {
-	body := AccessApp{
+	body := accessAppRequest{
 		Name:     name,
 		Domain:   domain,
 		Type:     "self_hosted",

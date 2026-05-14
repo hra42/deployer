@@ -64,7 +64,12 @@ func TestCreateAccessAppBody(t *testing.T) {
 			t.Errorf("path = %s", r.URL.Path)
 		}
 		body, _ := io.ReadAll(r.Body)
-		var got AccessApp
+		var got struct {
+			Name     string   `json:"name"`
+			Domain   string   `json:"domain"`
+			Type     string   `json:"type"`
+			Policies []string `json:"policies"`
+		}
 		if err := json.Unmarshal(body, &got); err != nil {
 			t.Fatalf("decode body: %v", err)
 		}
@@ -98,7 +103,9 @@ func TestUpdateAccessAppPath(t *testing.T) {
 			t.Errorf("path = %s", r.URL.Path)
 		}
 		body, _ := io.ReadAll(r.Body)
-		var got AccessApp
+		var got struct {
+			Policies []string `json:"policies"`
+		}
 		if err := json.Unmarshal(body, &got); err != nil {
 			t.Fatalf("decode body: %v", err)
 		}
