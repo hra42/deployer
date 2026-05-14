@@ -5,10 +5,16 @@
 #   curl -fsSL https://deployer.hra42.lol/install | sh
 #   curl -fsSL https://deployer.hra42.lol/install | VERSION=v0.1.0 sh
 #   curl -fsSL https://deployer.hra42.lol/install | INSTALL_DIR=$HOME/.local/bin sh
+#   curl -fsSL https://deployer.hra42.lol/install | USER_INSTALL=1 sh
 #
 # Env vars:
-#   VERSION      Tag to install (default: latest release).
-#   INSTALL_DIR  Target directory (default: /usr/local/bin, or $HOME/.local/bin if not writable).
+#   VERSION       Tag to install (default: latest release).
+#   INSTALL_DIR   Target directory (overrides defaults).
+#   USER_INSTALL  If set to 1, install to $HOME/.local/bin instead of /usr/local/bin.
+#
+# Default install location is /usr/local/bin (system-wide, available to all users).
+# sudo is used automatically if the target is not writable. Set USER_INSTALL=1
+# for a per-user install when sudo is not available or not desired.
 
 set -eu
 
@@ -99,24 +105,33 @@ chmod +x "$bin_path"
 # Pick install dir
 install_dir="${INSTALL_DIR:-}"
 if [ -z "$install_dir" ]; then
-  if [ -w /usr/local/bin ] 2>/dev/null; then
-    install_dir="/usr/local/bin"
-  elif [ "$(id -u)" = "0" ]; then
+  if [ "${USER_INSTALL:-0}" = "1" ]; then
+    install_dir="$HOME/.local/bin"
+  elif [ "$(id -u)" = "0" ] || command -v sudo >/dev/null 2>&1; then
     install_dir="/usr/local/bin"
   else
+    info "no sudo available; falling back to user install at \$HOME/.local/bin"
     install_dir="$HOME/.local/bin"
   fi
 fi
 
-mkdir -p "$install_dir"
 target="$install_dir/$BIN"
 
-if [ -w "$install_dir" ]; then
-  install -m 0755 "$bin_path" "$target"
-else
-  info "elevating with sudo to write $target"
-  sudo install -m 0755 "$bin_path" "$target"
+# Decide whether sudo is needed for mkdir + install.
+sudo=""
+if [ ! -w "$install_dir" ] 2>/dev/null; then
+  parent="$(dirname "$install_dir")"
+  if [ ! -d "$install_dir" ] && [ -w "$parent" ] 2>/dev/null; then
+    : # we can create it as the current user
+  elif [ "$(id -u)" != "0" ]; then
+    command -v sudo >/dev/null 2>&1 || err "$install_dir is not writable and sudo is not available"
+    sudo="sudo"
+    info "elevating with sudo to write $target"
+  fi
 fi
+
+$sudo mkdir -p "$install_dir"
+$sudo install -m 0755 "$bin_path" "$target"
 
 info "installed: $target"
 
