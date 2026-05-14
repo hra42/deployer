@@ -22,7 +22,7 @@ The pipeline lives entirely in `internal/deploy/deploy.Run`. It is a fixed 6-pha
 1. SSH connect (`internal/sshx`) — uses `golang.org/x/crypto/ssh` with `InsecureIgnoreHostKey` (known limitation called out in README).
 2. Sync repo — `git clone` on first run, `git pull --ff-only` thereafter. The clone URL is built by `buildCloneCmd`, which normalizes `owner/name` / `github.com/...` / full URLs and injects the GitHub token as `https://x-access-token:<token>@...`.
 3. Validate — checks `Dockerfile` and `docker-compose.yml` exist on the host.
-4. `docker compose pull && docker compose up -d --remove-orphans`, with `COMPOSE_PROJECT_NAME` set to the domain slug so multiple apps coexist on one host.
+4. `docker compose build --pull && docker compose up -d --remove-orphans`, with `COMPOSE_PROJECT_NAME` set to the domain slug so multiple apps coexist on one host. `build --pull` rebuilds services with a `build:` directive against fresh base images; it's a no-op for `image:`-only services.
 5. Cloudflare DNS — create or update a proxied CNAME via `internal/cloudflare`.
 6. Cloudflare Zero Trust — create or update an Access app and attach a pre-existing policy.
 

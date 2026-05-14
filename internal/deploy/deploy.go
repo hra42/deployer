@@ -109,8 +109,13 @@ func Run(ctx context.Context, opts Options) (err error) {
 
 	// Phase 4: Bring up containers
 	ui.Phase(4, phaseNames[3])
+	// `build --pull` rebuilds any service with a `build:` directive against a
+	// fresh base image, and is a no-op for services that only reference
+	// `image:`. This keeps the pipeline correct for repos whose containers are
+	// built on the host (most common here) without breaking registry-only
+	// setups.
 	upCmd := fmt.Sprintf(
-		"cd %s && COMPOSE_PROJECT_NAME=%s docker compose pull && COMPOSE_PROJECT_NAME=%s docker compose up -d --remove-orphans",
+		"cd %s && COMPOSE_PROJECT_NAME=%s docker compose build --pull && COMPOSE_PROJECT_NAME=%s docker compose up -d --remove-orphans",
 		shellQuote(remotePath), shellQuote(s), shellQuote(s),
 	)
 	if err = client.Run(ctx, upCmd); err != nil {
