@@ -167,6 +167,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 		mark(5, ui.StatusSkipped, "zero_trust_policy_id not set")
 	} else {
 		cf := cloudflare.New(opts.Cfg.CloudflareAPIToken)
+		policies := []string{opts.Cfg.ZeroTrustPolicyID}
 		var existing *cloudflare.AccessApp
 		existing, err = cf.FindAccessApp(ctx, opts.Cfg.CloudflareAccountID, opts.Domain)
 		if err != nil {
@@ -174,30 +175,20 @@ func Run(ctx context.Context, opts Options) (err error) {
 			mark(5, ui.StatusFailed, fmt.Sprintf("cloudflare access for %s", opts.Domain))
 			return err
 		}
-		var appID string
 		if existing == nil {
 			ui.Info(fmt.Sprintf("creating Access app for %s", opts.Domain))
-			var created *cloudflare.AccessApp
-			created, err = cf.CreateAccessApp(ctx, opts.Cfg.CloudflareAccountID, opts.Domain, opts.Domain)
-			if err != nil {
+			if _, err = cf.CreateAccessApp(ctx, opts.Cfg.CloudflareAccountID, opts.Domain, opts.Domain, policies); err != nil {
 				ui.Failf("cloudflare access for %s: %v", opts.Domain, err)
 				mark(5, ui.StatusFailed, fmt.Sprintf("cloudflare access for %s", opts.Domain))
 				return err
 			}
-			appID = created.ID
 		} else {
 			ui.Info(fmt.Sprintf("updating Access app for %s", opts.Domain))
-			if err = cf.UpdateAccessApp(ctx, opts.Cfg.CloudflareAccountID, existing.ID, opts.Domain, opts.Domain); err != nil {
+			if err = cf.UpdateAccessApp(ctx, opts.Cfg.CloudflareAccountID, existing.ID, opts.Domain, opts.Domain, policies); err != nil {
 				ui.Failf("cloudflare access for %s: %v", opts.Domain, err)
 				mark(5, ui.StatusFailed, fmt.Sprintf("cloudflare access for %s", opts.Domain))
 				return err
 			}
-			appID = existing.ID
-		}
-		if err = cf.AttachAccessPolicy(ctx, opts.Cfg.CloudflareAccountID, appID, opts.Cfg.ZeroTrustPolicyID); err != nil {
-			ui.Failf("cloudflare access for %s: %v", opts.Domain, err)
-			mark(5, ui.StatusFailed, fmt.Sprintf("cloudflare access for %s", opts.Domain))
-			return err
 		}
 		ui.OK(fmt.Sprintf("Access app for %s protected by policy %s", opts.Domain, opts.Cfg.ZeroTrustPolicyID))
 		mark(5, ui.StatusOK, fmt.Sprintf("policy %s", opts.Cfg.ZeroTrustPolicyID))
